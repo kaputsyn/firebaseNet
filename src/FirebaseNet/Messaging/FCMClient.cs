@@ -73,7 +73,7 @@ namespace FirebaseNet.Messaging
 
                 //TODO: handle retry-timeout for 500 messages
                 var errorMessage = await result.Content.ReadAsStringAsync();
-                throw new FCMException(result.StatusCode, errorMessage);
+                throw new FCMException(result.StatusCode , result.ReasonPhrase + " " +  errorMessage);
             }
 
             var content = await result.Content.ReadAsStringAsync();
