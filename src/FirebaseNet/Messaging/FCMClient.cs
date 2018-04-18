@@ -3,6 +3,7 @@ using FirebaseNet.Serialization;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Net;
 using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Text;
@@ -17,13 +18,25 @@ namespace FirebaseNet.Messaging
         private ISerializer _serializer;
 
         private string _serverKey { get; set; }
+        private HttpClient _httpClient;
+        private object syncLock = new object();
+        private IWebProxy _proxy;
 
+        public FCMClient(string serverKey,IWebProxy proxy, ISerializer serializer)
+        {
+            _serverKey = serverKey;
+            _serializer = serializer;
+            _proxy = proxy;
+        }
         public FCMClient(string serverKey, ISerializer serializer)
         {
             _serverKey = serverKey;
             _serializer = serializer;
         }
+        public FCMClient(string serverKey, IWebProxy proxy) : this(serverKey, proxy, new JsonNetSerializer())
+        {
 
+        }
         public FCMClient(string serverKey):this(serverKey, new JsonNetSerializer())
         {
 
@@ -60,7 +73,7 @@ namespace FirebaseNet.Messaging
 
                 //TODO: handle retry-timeout for 500 messages
                 var errorMessage = await result.Content.ReadAsStringAsync();
-                throw new FCMException(result.StatusCode, errorMessage);
+                throw new FCMException(result.StatusCode , result.ReasonPhrase + " " +  errorMessage);
             }
 
             var content = await result.Content.ReadAsStringAsync();
@@ -81,8 +94,7 @@ namespace FirebaseNet.Messaging
         /// Automatically sets all measages as dry_run
         /// </summary>
         public bool TestMode { get; set; }
-
-        private static readonly HttpClient _httpClient = new HttpClient();
+        
         /// <summary>
         /// Gets or sets the HttpClient used by the FCMClient.
         /// Aid for test purposes.
@@ -91,6 +103,23 @@ namespace FirebaseNet.Messaging
         {
             get
             {
+                if (_httpClient == null)
+                {
+                    lock (syncLock)
+                    {
+                        if (_httpClient == null)
+                        {
+                            if (_proxy != null)
+                            {
+                                _httpClient = new HttpClient(new HttpClientHandler() { Proxy = _proxy });
+                            }
+                            else
+                            {
+                                _httpClient = new HttpClient();
+                            }
+                        }
+                    }
+                }
                 return _httpClient;
             }
         }
